@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # 后端API服务
+  backend:
+    build: ./backend
+    container_name: llmbridge-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://llmbridge:llmbridge_password@db:5432/llmbridge
+      - SECRET_KEY=your-production-secret-key-change-this
+      - ENCRYPTION_KEY=your-production-encryption-key-change-this
+      - REDIS_URL=redis://redis:6379
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - RATE_LIMIT_PER_MINUTE=100
+      - LOG_LEVEL=INFO
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+    networks:
+      - llmbridge-network
+
+  # 前端Web服务
+  frontend:
+    build: ./frontend
+    container_name: llmbridge-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - llmbridge-network
+
+  # PostgreSQL数据库
+  db:
+    image: postgres:15-alpine
+    container_name: llmbridge-db
+    environment:
+      - POSTGRES_DB=llmbridge
+      - POSTGRES_USER=llmbridge
+      - POSTGRES_PASSWORD=llmbridge_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - llmbridge-network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: llmbridge-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - llmbridge-network
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  llmbridge-network:
+    driver: bridge

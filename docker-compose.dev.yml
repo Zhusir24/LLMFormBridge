@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # 开发环境后端 - 使用SQLite
+  backend:
+    build: ./backend
+    container_name: llmbridge-backend-dev
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=sqlite:///./llmbridge.db
+      - SECRET_KEY=dev-secret-key
+      - ENCRYPTION_KEY=dev-encryption-key-change-this
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - RATE_LIMIT_PER_MINUTE=1000
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./backend:/app
+      - backend_data:/app/data
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - llmbridge-dev-network
+
+  # 开发环境前端
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: llmbridge-frontend-dev
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+    networks:
+      - llmbridge-dev-network
+
+volumes:
+  backend_data:
+
+networks:
+  llmbridge-dev-network:
+    driver: bridge
