@@ -29,6 +29,25 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# 加载环境变量
+load_env_config() {
+    if [ -f ".env" ]; then
+        log_info "加载环境变量配置..."
+        # 过滤注释和空行，加载KEY=VALUE格式的配置
+        export $(cat .env | grep -v '^#' | grep -v '^$' | xargs)
+        log_success "环境变量加载完成"
+    else
+        log_warning ".env 文件不存在，使用默认配置"
+    fi
+
+    # 设置默认值
+    export BACKEND_HOST=${BACKEND_HOST:-"0.0.0.0"}
+    export BACKEND_PORT=${BACKEND_PORT:-8000}
+    export FRONTEND_PORT=${FRONTEND_PORT:-3000}
+
+    log_info "配置信息: 后端端口=${BACKEND_PORT}, 前端端口=${FRONTEND_PORT}"
+}
+
 # 检查依赖
 check_dependencies() {
     log_info "检查依赖环境..."
@@ -117,7 +136,7 @@ start_backend() {
     export PYTHONPATH=.
 
     # 启动后端服务
-    ../.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
+    ../.venv/bin/python -m uvicorn app.main:app --reload --host ${BACKEND_HOST} --port ${BACKEND_PORT} &
     BACKEND_PID=$!
 
     cd ..
@@ -127,10 +146,10 @@ start_backend() {
     sleep 5
 
     # 检查后端是否启动成功
-    if curl -f http://localhost:8000/health &> /dev/null; then
+    if curl -f http://localhost:${BACKEND_PORT}/health &> /dev/null; then
         log_success "后端服务启动成功 (PID: $BACKEND_PID)"
-        log_info "后端服务地址: http://localhost:8000"
-        log_info "API文档地址: http://localhost:8000/docs"
+        log_info "后端服务地址: http://localhost:${BACKEND_PORT}"
+        log_info "API文档地址: http://localhost:${BACKEND_PORT}/docs"
     else
         log_error "后端服务启动失败"
         return 1
@@ -153,7 +172,7 @@ start_frontend() {
     sleep 8
 
     log_success "前端服务启动成功 (PID: $FRONTEND_PID)"
-    log_info "前端服务地址: http://localhost:3000"
+    log_info "前端服务地址: http://localhost:${FRONTEND_PORT}"
 }
 
 # 停止服务
@@ -197,6 +216,7 @@ main() {
     case $command in
         "start")
             log_info "=== LLMFormBridge 启动 ==="
+            load_env_config
             check_dependencies
             install_backend_deps
             install_frontend_deps
@@ -205,9 +225,9 @@ main() {
             start_frontend
 
             log_success "=== 所有服务启动完成 ==="
-            log_info "前端地址: http://localhost:3000"
-            log_info "后端地址: http://localhost:8000"
-            log_info "API文档: http://localhost:8000/docs"
+            log_info "前端地址: http://localhost:${FRONTEND_PORT}"
+            log_info "后端地址: http://localhost:${BACKEND_PORT}"
+            log_info "API文档: http://localhost:${BACKEND_PORT}/docs"
             log_info ""
             log_info "按 Ctrl+C 停止所有服务"
 
@@ -227,6 +247,7 @@ main() {
             ;;
 
         "install")
+            load_env_config
             check_dependencies
             install_backend_deps
             install_frontend_deps
@@ -236,14 +257,15 @@ main() {
 
         "backend")
             log_info "=== 启动后端服务 ==="
+            load_env_config
             check_dependencies
             install_backend_deps
             init_database
             start_backend
 
             log_success "=== 后端服务启动完成 ==="
-            log_info "后端地址: http://localhost:8000"
-            log_info "API文档: http://localhost:8000/docs"
+            log_info "后端地址: http://localhost:${BACKEND_PORT}"
+            log_info "API文档: http://localhost:${BACKEND_PORT}/docs"
             log_info ""
             log_info "按 Ctrl+C 停止服务"
 
@@ -253,6 +275,7 @@ main() {
 
         "frontend")
             log_info "=== 启动前端服务 ==="
+            load_env_config
             if ! command -v node &> /dev/null; then
                 log_error "Node.js 未安装"
                 exit 1
@@ -261,7 +284,7 @@ main() {
             start_frontend
 
             log_success "=== 前端服务启动完成 ==="
-            log_info "前端地址: http://localhost:3000"
+            log_info "前端地址: http://localhost:${FRONTEND_PORT}"
             log_info ""
             log_info "按 Ctrl+C 停止服务"
 

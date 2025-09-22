@@ -329,24 +329,92 @@ npm install
 npm run dev
 ```
 
-### 环境变量
+### 环境变量配置
 
-在 `backend/.env` 文件中配置：
+项目使用**统一的根目录.env文件**控制前后端所有配置。
+
+#### 📁 配置文件位置
+```bash
+# 主配置文件（推荐使用）
+.env                    # 统一的环境变量配置
+
+# 模板文件（可参考）
+.env.example           # 配置模板和说明
+backend/.env.example   # 后端配置模板
+frontend/.env.example  # 前端配置模板
+```
+
+#### 🔧 端口配置说明
+
+**.env文件中包含两组端口配置，必须保持一致：**
 
 ```env
+# =================== 后端服务器配置 ===================
+# 用于后端FastAPI服务和start.sh脚本
+
+BACKEND_HOST=0.0.0.0    # 后端监听地址
+BACKEND_PORT=8000       # 后端实际运行端口
+FRONTEND_PORT=3000      # 前端端口（脚本显示用）
+
+# =================== 前端专用配置 ===================
+# VITE_开头变量只能被前端代码读取（技术限制）
+
+VITE_FRONTEND_PORT=3000      # 前端Vite开发服务器端口
+VITE_BACKEND_PORT=8000       # 前端API请求的后端端口 ⚠️必须与BACKEND_PORT一致
+VITE_BACKEND_HOST=localhost  # 前端API请求的后端地址
+```
+
+#### 📝 修改端口示例
+
+**如果要改为后端10008端口，前端10007端口：**
+
+```env
+# 后端配置组
+BACKEND_PORT=10008
+FRONTEND_PORT=10007
+
+# 前端配置组
+VITE_FRONTEND_PORT=10007
+VITE_BACKEND_PORT=10008
+
+# 同时更新相关URL
+VITE_API_BASE_URL=http://localhost:10008/api
+VITE_BACKEND_URL=http://localhost:10008
+FRONTEND_URL=http://localhost:10007
+```
+
+#### 🔐 完整配置示例
+
+```env
+# 应用设置
+APP_NAME=LLMFormBridge
+DEBUG=true
+
+# 服务器配置
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
+FRONTEND_PORT=3000
+
 # 数据库配置
-DATABASE_URL=sqlite:///./app.db
+DATABASE_URL=sqlite:///./llmbridge.db
 
 # JWT配置
-SECRET_KEY=your-secret-key-here
+SECRET_KEY=your-secret-key-change-in-production
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# 加密密钥（32字节）
+# 加密密钥
 ENCRYPTION_KEY=your-32-byte-encryption-key
 
-# 开发模式
-DEBUG=true
+# 前端配置
+VITE_FRONTEND_PORT=3000
+VITE_BACKEND_PORT=8000
+VITE_API_BASE_URL=http://localhost:8000/api
 ```
+
+**📌 注意事项：**
+- 🔄 两组端口配置必须保持一致，否则前端无法连接后端
+- 🎯 修改端口时需同时更新相关的URL配置
+- 🔧 使用 `cp .env.example .env` 创建配置文件
 
 ### 数据库迁移
 
