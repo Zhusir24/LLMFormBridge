@@ -46,7 +46,92 @@ import { useSnapshot } from 'valtio';
 import { credentialStore } from '../store/credentials';
 import { credentialService } from '../services/credentials';
 import { addNotification } from '../store/ui';
-import { Credential, CredentialCreate, Provider } from '../types/credential';
+import { Credential, CredentialCreate, Provider, ModelValidationResult } from '../types/credential';
+
+// 详细验证结果组件
+const ModelValidationDetails: React.FC<{
+  credential: Credential;
+  expanded: boolean;
+  onToggle: () => void;
+}> = ({ credential, expanded, onToggle }) => {
+  const validationResults = credential.model_validation_results || {};
+  const validModels = Object.entries(validationResults).filter(([_, result]) => result.is_valid);
+  const failedModels = Object.entries(validationResults).filter(([_, result]) => !result.is_valid);
+
+  if (Object.keys(validationResults).length === 0) {
+    return null;
+  }
+
+  return (
+    <Box mt={1}>
+      <Button
+        size="small"
+        onClick={onToggle}
+        startIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        sx={{ mb: 1 }}
+      >
+        验证详情 ({validModels.length} 成功, {failedModels.length} 失败)
+      </Button>
+
+      <Collapse in={expanded}>
+        <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+          {validModels.length > 0 && (
+            <Box mb={2}>
+              <Typography variant="subtitle2" color="success.main" gutterBottom>
+                ✓ 验证成功的模型 ({validModels.length}个):
+              </Typography>
+              <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                {validModels.map(([modelName]) => (
+                  <Chip
+                    key={modelName}
+                    label={modelName}
+                    size="small"
+                    color="success"
+                    variant="outlined"
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {failedModels.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" color="error.main" gutterBottom>
+                ✗ 验证失败的模型 ({failedModels.length}个):
+              </Typography>
+              <Stack spacing={1}>
+                {failedModels.map(([modelName, result]) => (
+                  <Box key={modelName}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Chip
+                        label={modelName}
+                        size="small"
+                        color="error"
+                        variant="outlined"
+                      />
+                      {result.error && (
+                        <Typography variant="caption" color="error.main">
+                          {result.error}
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          <Typography variant="caption" color="textSecondary" display="block" mt={1}>
+            验证时间: {validModels.length > 0 ?
+              new Date(validModels[0][1].validated_at).toLocaleString() :
+              (failedModels.length > 0 ? new Date(failedModels[0][1].validated_at).toLocaleString() : '')
+            }
+          </Typography>
+        </Paper>
+      </Collapse>
+    </Box>
+  );
+};
 
 const Credentials: React.FC = () => {
   const { credentials, isLoading } = useSnapshot(credentialStore);
@@ -65,6 +150,7 @@ const Credentials: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [credentialModels, setCredentialModels] = useState<Record<string, string[]>>({});
   const [expandedCredentials, setExpandedCredentials] = useState<Record<string, boolean>>({});
+  const [expandedValidationDetails, setExpandedValidationDetails] = useState<Record<string, boolean>>({});
   const [newCustomModel, setNewCustomModel] = useState('');
   const [showCustomModels, setShowCustomModels] = useState(false);
 
@@ -108,6 +194,13 @@ const Credentials: React.FC = () => {
 
   const toggleModelExpansion = (credentialId: string) => {
     setExpandedCredentials(prev => ({
+      ...prev,
+      [credentialId]: !prev[credentialId]
+    }));
+  };
+
+  const toggleValidationDetails = (credentialId: string) => {
+    setExpandedValidationDetails(prev => ({
       ...prev,
       [credentialId]: !prev[credentialId]
     }));
@@ -245,21 +338,37 @@ const Credentials: React.FC = () => {
     setValidating({ ...validating, [credential.id]: true });
     try {
       const result = await credentialService.validateCredential(credential.id);
+
       if (result.is_valid) {
+        const successMessage = result.validation_summary ||
+          `凭证"${credential.name}"验证通过，${result.available_models?.length || 0}个模型可用`;
+
         addNotification({
           type: 'success',
           title: '验证成功',
-          message: `凭证"${credential.name}"验证通过`,
+          message: successMessage,
         });
+
         // 验证成功后加载可用模型
-        await loadCredentialModels(credential.id);
+        if (result.available_models) {
+          setCredentialModels(prev => ({
+            ...prev,
+            [credential.id]: result.available_models!
+          }));
+        }
       } else {
+        const errorMessage = result.validation_summary ||
+          result.error_message ||
+          '凭证验证失败';
+
         addNotification({
-          type: 'error',
-          title: '验证失败',
-          message: result.error_message || '凭证验证失败',
+          type: 'warning',
+          title: result.failed_models?.length === result.total_models_tested ? '验证失败' : '部分验证失败',
+          message: errorMessage,
         });
       }
+
+      // 刷新凭证列表以获取最新的验证结果
       loadCredentials();
     } catch (error: any) {
       addNotification({
@@ -446,6 +555,13 @@ const Credentials: React.FC = () => {
                       {credential.validation_error}
                     </Alert>
                   )}
+
+                  {/* 详细验证结果 */}
+                  <ModelValidationDetails
+                    credential={credential}
+                    expanded={expandedValidationDetails[credential.id] || false}
+                    onToggle={() => toggleValidationDetails(credential.id)}
+                  />
 
                   <Typography variant="caption" color="textSecondary" display="block" mt={1}>
                     创建时间: {new Date(credential.created_at).toLocaleString()}

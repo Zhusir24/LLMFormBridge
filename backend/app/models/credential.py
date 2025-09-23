@@ -15,6 +15,7 @@ class Credential(Base):
     api_key_encrypted = Column(Text, nullable=False)
     api_url = Column(String(255))
     custom_models = Column(JSON, default=lambda: [])  # 用户自定义的模型列表
+    model_validation_results = Column(JSON, default=lambda: {})  # 各模型验证结果详情
     is_active = Column(Boolean, default=True)
     is_validated = Column(Boolean, default=False)
     validation_error = Column(Text)

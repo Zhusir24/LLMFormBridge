@@ -64,12 +64,12 @@ class ClaudeCodeAdapter(AbstractLLMAdapter):
             # 发送一个简单的测试请求（使用支持的模型）
             test_request = {
                 "model": "claude-3-5-sonnet-20241022",  # 使用支持的模型
-                "messages": [{"role": "user", "content": "Hi"}],
+                "messages": [{"role": "user", "content": "我想知道模型有哪些架构"}],
                 "max_tokens": 50,  # 减少token数量，加快验证速度
                 "system": [
                     {
                         "type": "text",
-                        "text": "你是一个编程助手,请根据用户的问题给出详细的回答.",
+                        "text": "你是一个专业的claude编程助手",
                         "cache_control": {
                             "type": "ephemeral"
                         }

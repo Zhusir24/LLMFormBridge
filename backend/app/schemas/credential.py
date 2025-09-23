@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Dict, Any
 from datetime import datetime
 
 
@@ -40,16 +40,25 @@ class CredentialResponse(CredentialBase):
     is_active: bool
     is_validated: bool
     validation_error: Optional[str]
+    model_validation_results: Optional[Dict[str, Any]] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
     api_key_masked: str  # 只显示前几位和后几位
 
     class Config:
         from_attributes = True
+        protected_namespaces = ()
 
 
 class CredentialValidate(BaseModel):
     """验证凭证响应"""
     is_valid: bool
     error_message: Optional[str] = None
-    available_models: Optional[list[str]] = None
+    available_models: Optional[List[str]] = None
+    failed_models: Optional[List[str]] = None
+    model_validation_results: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    total_models_tested: Optional[int] = None
+    validation_summary: Optional[str] = None
+
+    class Config:
+        protected_namespaces = ()

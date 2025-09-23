@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from typing import List, Optional
+from typing import List, Optional, Dict
 from app.models.credential import Credential
 from app.models.user import User
 from app.schemas.credential import CredentialCreate, CredentialUpdate, CredentialValidate
@@ -8,6 +8,8 @@ from app.utils.security import encrypt_api_key, decrypt_api_key
 from app.adapters.factory import LLMAdapterFactory
 from app.exceptions import CredentialValidationError
 import logging
+import asyncio
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +120,7 @@ class CredentialService:
         return True
 
     async def validate_credential(self, user: User, credential_id: str) -> CredentialValidate:
-        """验证凭证"""
+        """验证凭证 - 支持多模型并行验证"""
         credential = self.get_credential_by_id(user, credential_id)
         if not credential:
             raise CredentialValidationError("Credential not found")
@@ -127,87 +129,69 @@ class CredentialService:
             # 解密API密钥
             api_key = decrypt_api_key(credential.api_key_encrypted)
 
-            # 创建适配器并验证
+            # 创建适配器
             adapter = LLMAdapterFactory.create_adapter(
                 provider=credential.provider,
                 api_key=api_key,
                 api_url=credential.api_url
             )
 
-            # 如果用户定义了自定义模型，则验证这些模型
+            # 确定要验证的模型列表
             if credential.custom_models:
-                valid_models = []
-                invalid_models = []
-
-                for model in credential.custom_models:
-                    try:
-                        # 使用适配器的内置验证方法验证每个模型
-                        is_model_valid = await adapter.validate_model(model)
-                        if is_model_valid:
-                            valid_models.append(model)
-                        else:
-                            invalid_models.append(model)
-                    except Exception as model_error:
-                        logger.warning(f"Model {model} validation failed: {model_error}")
-                        invalid_models.append(model)
-
-                if valid_models:
-                    # 至少有一个模型可用
-                    credential.is_validated = True
-                    credential.validation_error = None
-                    if invalid_models:
-                        credential.validation_error = f"Some models failed: {', '.join(invalid_models)}"
-                    self.db.commit()
-
-                    await adapter.close()
-
-                    return CredentialValidate(
-                        is_valid=True,
-                        available_models=valid_models
-                    )
-                else:
-                    # 所有自定义模型都无法使用
-                    credential.is_validated = False
-                    credential.validation_error = f"All custom models failed: {', '.join(invalid_models)}"
-                    self.db.commit()
-
-                    await adapter.close()
-
-                    return CredentialValidate(
-                        is_valid=False,
-                        error_message=f"All custom models failed: {', '.join(invalid_models)}"
-                    )
+                models_to_validate = credential.custom_models
             else:
-                # 没有自定义模型，使用默认验证
-                is_valid = await adapter.validate_credentials()
+                # 获取默认模型列表
+                models_to_validate = await adapter.get_available_models()
 
-                if is_valid:
-                    # 获取可用模型
-                    available_models = await adapter.get_available_models()
+            # 并行验证所有模型
+            validation_results = await self._validate_models_parallel(
+                adapter, models_to_validate
+            )
 
-                    # 更新验证状态
-                    credential.is_validated = True
-                    credential.validation_error = None
-                    self.db.commit()
+            # 统计验证结果
+            valid_models = [model for model, result in validation_results.items()
+                           if result["is_valid"]]
+            invalid_models = [model for model, result in validation_results.items()
+                             if not result["is_valid"]]
 
-                    await adapter.close()
+            # 保存详细验证结果到数据库
+            credential.model_validation_results = validation_results
 
-                    return CredentialValidate(
-                        is_valid=True,
-                        available_models=available_models
-                    )
+            # 更新整体验证状态
+            if valid_models:
+                credential.is_validated = True
+                if invalid_models:
+                    credential.validation_error = f"部分模型验证失败: {', '.join(invalid_models)}"
                 else:
-                    # 更新验证状态
-                    credential.is_validated = False
-                    credential.validation_error = "Invalid credentials"
-                    self.db.commit()
+                    credential.validation_error = None
+            else:
+                credential.is_validated = False
+                credential.validation_error = f"所有模型验证失败: {', '.join(invalid_models)}"
 
-                    await adapter.close()
+            self.db.commit()
+            await adapter.close()
 
-                    return CredentialValidate(
-                        is_valid=False,
-                        error_message="Invalid credentials"
-                    )
+            # 创建验证摘要
+            total_tested = len(models_to_validate)
+            valid_count = len(valid_models)
+            failed_count = len(invalid_models)
+
+            if valid_count == total_tested:
+                summary = f"所有 {total_tested} 个模型验证成功"
+            elif valid_count > 0:
+                summary = f"{valid_count}/{total_tested} 个模型验证成功，{failed_count} 个失败"
+            else:
+                summary = f"所有 {total_tested} 个模型验证失败"
+
+            return CredentialValidate(
+                is_valid=len(valid_models) > 0,
+                available_models=valid_models,
+                failed_models=invalid_models,
+                model_validation_results=validation_results,
+                total_models_tested=total_tested,
+                validation_summary=summary,
+                error_message=credential.validation_error
+            )
 
         except Exception as e:
             logger.error(f"Credential validation error: {e}")
@@ -215,12 +199,41 @@ class CredentialService:
             # 更新验证状态
             credential.is_validated = False
             credential.validation_error = str(e)
+            credential.model_validation_results = {}
             self.db.commit()
 
             return CredentialValidate(
                 is_valid=False,
                 error_message=str(e)
             )
+
+    async def _validate_models_parallel(self, adapter, models: List[str]) -> Dict[str, Dict]:
+        """并行验证多个模型"""
+        async def validate_single_model(model_name: str) -> tuple[str, Dict]:
+            """验证单个模型"""
+            try:
+                is_valid = await adapter.validate_model(model_name)
+                return model_name, {
+                    "is_valid": is_valid,
+                    "error": None,
+                    "validated_at": datetime.utcnow().isoformat()
+                }
+            except Exception as e:
+                logger.warning(f"Model {model_name} validation failed: {e}")
+                return model_name, {
+                    "is_valid": False,
+                    "error": str(e),
+                    "validated_at": datetime.utcnow().isoformat()
+                }
+
+        # 创建并行任务
+        tasks = [validate_single_model(model) for model in models]
+
+        # 并行执行验证
+        results = await asyncio.gather(*tasks)
+
+        # 转换为字典格式
+        return dict(results)
 
     def mask_api_key(self, api_key_encrypted: str) -> str:
         """遮盖API密钥"""

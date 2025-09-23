@@ -1,5 +1,11 @@
 export type Provider = 'openai' | 'anthropic' | 'claude_code';
 
+export interface ModelValidationResult {
+  is_valid: boolean;
+  error?: string;
+  validated_at: string;
+}
+
 export interface Credential {
   id: string;
   user_id: string;
@@ -7,6 +13,7 @@ export interface Credential {
   provider: Provider;
   api_url?: string;
   custom_models: string[];
+  model_validation_results?: Record<string, ModelValidationResult>;
   is_active: boolean;
   is_validated: boolean;
   validation_error?: string;
@@ -35,6 +42,10 @@ export interface CredentialValidation {
   is_valid: boolean;
   error_message?: string;
   available_models?: string[];
+  failed_models?: string[];
+  model_validation_results?: Record<string, ModelValidationResult>;
+  total_models_tested?: number;
+  validation_summary?: string;
 }
 
 export interface CredentialState {
