@@ -21,6 +21,13 @@ import {
   Alert,
   CircularProgress,
   Link,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Collapse,
+  Paper,
+  Stack,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -33,6 +40,7 @@ import {
   Refresh as RefreshIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useSnapshot } from 'valtio';
 import { credentialStore } from '../store/credentials';
@@ -51,11 +59,14 @@ const Credentials: React.FC = () => {
     provider: 'openai',
     api_key: '',
     api_url: '',
+    custom_models: [],
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [credentialModels, setCredentialModels] = useState<Record<string, string[]>>({});
   const [expandedCredentials, setExpandedCredentials] = useState<Record<string, boolean>>({});
+  const [newCustomModel, setNewCustomModel] = useState('');
+  const [showCustomModels, setShowCustomModels] = useState(false);
 
   useEffect(() => {
     loadCredentials();
@@ -109,8 +120,11 @@ const Credentials: React.FC = () => {
       provider: 'openai',
       api_key: '',
       api_url: '',
+      custom_models: [],
     });
     setErrors({});
+    setNewCustomModel('');
+    setShowCustomModels(false);
     setOpen(true);
   };
 
@@ -121,9 +135,36 @@ const Credentials: React.FC = () => {
       provider: credential.provider,
       api_key: '', // 不显示原密钥
       api_url: credential.api_url || '',
+      custom_models: credential.custom_models || [],
     });
     setErrors({});
+    setNewCustomModel('');
+    setShowCustomModels(credential.custom_models && credential.custom_models.length > 0);
     setOpen(true);
+  };
+
+  const addCustomModel = () => {
+    if (newCustomModel.trim() && !formData.custom_models?.includes(newCustomModel.trim())) {
+      setFormData({
+        ...formData,
+        custom_models: [...(formData.custom_models || []), newCustomModel.trim()]
+      });
+      setNewCustomModel('');
+    }
+  };
+
+  const removeCustomModel = (modelToRemove: string) => {
+    setFormData({
+      ...formData,
+      custom_models: formData.custom_models?.filter(model => model !== modelToRemove) || []
+    });
+  };
+
+  const handleCustomModelKeyPress = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addCustomModel();
+    }
   };
 
   const handleSubmit = async () => {
@@ -146,6 +187,7 @@ const Credentials: React.FC = () => {
         const updateData: any = {
           name: formData.name,
           api_url: formData.api_url || undefined,
+          custom_models: formData.custom_models || [],
         };
         if (formData.api_key.trim()) {
           updateData.api_key = formData.api_key;
@@ -495,6 +537,68 @@ const Credentials: React.FC = () => {
               }
               fullWidth
             />
+
+            {/* 自定义模型设置 */}
+            <Box>
+              <Button
+                variant="outlined"
+                onClick={() => setShowCustomModels(!showCustomModels)}
+                startIcon={showCustomModels ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                fullWidth
+                sx={{ justifyContent: 'flex-start' }}
+              >
+                自定义模型列表 (可选)
+              </Button>
+
+              <Collapse in={showCustomModels}>
+                <Paper sx={{ mt: 1, p: 2, bgcolor: 'grey.50' }}>
+                  <Typography variant="body2" color="textSecondary" mb={2}>
+                    添加您要使用的自定义模型名称。如果设置了自定义模型，验证时将只测试这些模型而非默认模型列表。
+                  </Typography>
+
+                  <Stack direction="row" spacing={1} mb={2}>
+                    <TextField
+                      label="模型名称"
+                      value={newCustomModel}
+                      onChange={(e) => setNewCustomModel(e.target.value)}
+                      onKeyPress={handleCustomModelKeyPress}
+                      placeholder="例如: gpt-4, claude-3-opus-20240229"
+                      size="small"
+                      fullWidth
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={addCustomModel}
+                      disabled={!newCustomModel.trim()}
+                      size="small"
+                    >
+                      添加
+                    </Button>
+                  </Stack>
+
+                  {formData.custom_models && formData.custom_models.length > 0 && (
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        已添加的模型:
+                      </Typography>
+                      <Stack direction="row" flexWrap="wrap" gap={1}>
+                        {formData.custom_models.map((model, index) => (
+                          <Chip
+                            key={index}
+                            label={model}
+                            onDelete={() => removeCustomModel(model)}
+                            deleteIcon={<CloseIcon />}
+                            color="primary"
+                            variant="outlined"
+                            size="small"
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+                </Paper>
+              </Collapse>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>

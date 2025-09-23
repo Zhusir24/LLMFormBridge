@@ -38,7 +38,8 @@ class CredentialService:
             name=credential_data.name,
             provider=credential_data.provider,
             api_key_encrypted=encrypted_api_key,
-            api_url=credential_data.api_url
+            api_url=credential_data.api_url,
+            custom_models=credential_data.custom_models
         )
 
         self.db.add(credential)
@@ -92,6 +93,12 @@ class CredentialService:
         if update_data.api_url is not None:
             credential.api_url = update_data.api_url
 
+        if update_data.custom_models is not None:
+            credential.custom_models = update_data.custom_models
+            # 如果模型列表发生变化，重置验证状态
+            credential.is_validated = False
+            credential.validation_error = None
+
         if update_data.is_active is not None:
             credential.is_active = update_data.is_active
 
@@ -127,35 +134,80 @@ class CredentialService:
                 api_url=credential.api_url
             )
 
-            is_valid = await adapter.validate_credentials()
+            # 如果用户定义了自定义模型，则验证这些模型
+            if credential.custom_models:
+                valid_models = []
+                invalid_models = []
 
-            if is_valid:
-                # 获取可用模型
-                available_models = await adapter.get_available_models()
+                for model in credential.custom_models:
+                    try:
+                        # 使用适配器的内置验证方法验证每个模型
+                        is_model_valid = await adapter.validate_model(model)
+                        if is_model_valid:
+                            valid_models.append(model)
+                        else:
+                            invalid_models.append(model)
+                    except Exception as model_error:
+                        logger.warning(f"Model {model} validation failed: {model_error}")
+                        invalid_models.append(model)
 
-                # 更新验证状态
-                credential.is_validated = True
-                credential.validation_error = None
-                self.db.commit()
+                if valid_models:
+                    # 至少有一个模型可用
+                    credential.is_validated = True
+                    credential.validation_error = None
+                    if invalid_models:
+                        credential.validation_error = f"Some models failed: {', '.join(invalid_models)}"
+                    self.db.commit()
 
-                await adapter.close()
+                    await adapter.close()
 
-                return CredentialValidate(
-                    is_valid=True,
-                    available_models=available_models
-                )
+                    return CredentialValidate(
+                        is_valid=True,
+                        available_models=valid_models
+                    )
+                else:
+                    # 所有自定义模型都无法使用
+                    credential.is_validated = False
+                    credential.validation_error = f"All custom models failed: {', '.join(invalid_models)}"
+                    self.db.commit()
+
+                    await adapter.close()
+
+                    return CredentialValidate(
+                        is_valid=False,
+                        error_message=f"All custom models failed: {', '.join(invalid_models)}"
+                    )
             else:
-                # 更新验证状态
-                credential.is_validated = False
-                credential.validation_error = "Invalid credentials"
-                self.db.commit()
+                # 没有自定义模型，使用默认验证
+                is_valid = await adapter.validate_credentials()
 
-                await adapter.close()
+                if is_valid:
+                    # 获取可用模型
+                    available_models = await adapter.get_available_models()
 
-                return CredentialValidate(
-                    is_valid=False,
-                    error_message="Invalid credentials"
-                )
+                    # 更新验证状态
+                    credential.is_validated = True
+                    credential.validation_error = None
+                    self.db.commit()
+
+                    await adapter.close()
+
+                    return CredentialValidate(
+                        is_valid=True,
+                        available_models=available_models
+                    )
+                else:
+                    # 更新验证状态
+                    credential.is_validated = False
+                    credential.validation_error = "Invalid credentials"
+                    self.db.commit()
+
+                    await adapter.close()
+
+                    return CredentialValidate(
+                        is_valid=False,
+                        error_message="Invalid credentials"
+                    )
 
         except Exception as e:
             logger.error(f"Credential validation error: {e}")
@@ -189,6 +241,10 @@ class CredentialService:
         if not credential.is_validated:
             raise CredentialValidationError("Credential is not validated. Please validate the credential first.")
 
+        # 如果用户定义了自定义模型，返回这些模型
+        if credential.custom_models:
+            return credential.custom_models
+
         try:
             # 解密API密钥
             api_key = decrypt_api_key(credential.api_key_encrypted)
@@ -200,7 +256,7 @@ class CredentialService:
                 api_url=credential.api_url
             )
 
-            # 获取可用模型
+            # 获取适配器的默认可用模型
             models = await adapter.get_available_models()
             await adapter.close()
 

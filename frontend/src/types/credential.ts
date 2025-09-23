@@ -6,6 +6,7 @@ export interface Credential {
   name: string;
   provider: Provider;
   api_url?: string;
+  custom_models: string[];
   is_active: boolean;
   is_validated: boolean;
   validation_error?: string;
@@ -19,12 +20,14 @@ export interface CredentialCreate {
   provider: Provider;
   api_key: string;
   api_url?: string;
+  custom_models?: string[];
 }
 
 export interface CredentialUpdate {
   name?: string;
   api_key?: string;
   api_url?: string;
+  custom_models?: string[];
   is_active?: boolean;
 }
 

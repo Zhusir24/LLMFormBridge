@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -14,6 +14,7 @@ class Credential(Base):
     provider = Column(String(50), nullable=False)  # 'openai', 'anthropic'
     api_key_encrypted = Column(Text, nullable=False)
     api_url = Column(String(255))
+    custom_models = Column(JSON, default=lambda: [])  # 用户自定义的模型列表
     is_active = Column(Boolean, default=True)
     is_validated = Column(Boolean, default=False)
     validation_error = Column(Text)

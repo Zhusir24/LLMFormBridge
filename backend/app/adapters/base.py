@@ -47,6 +47,37 @@ class AbstractLLMAdapter(ABC):
         """获取可用模型列表"""
         pass
 
+    async def validate_model(self, model_name: str) -> bool:
+        """验证特定模型是否可用"""
+        try:
+            # 创建一个简单的测试请求
+            test_request = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": "Hi"}],
+                "max_tokens": 5
+            }
+
+            # 根据适配器类型选择合适的endpoint和请求格式
+            if hasattr(self, 'transform_request_to_anthropic'):
+                # Anthropic类型的适配器
+                transformed_request = self.transform_request_to_anthropic(
+                    LLMRequest(**test_request)
+                )
+                endpoint = "v1/messages"
+            else:
+                # OpenAI类型的适配器
+                transformed_request = self.transform_request_to_openai(
+                    LLMRequest(**test_request)
+                )
+                endpoint = "v1/chat/completions"
+
+            # 发送测试请求
+            response = await self.send_request(transformed_request, endpoint)
+            return True
+        except Exception as e:
+            logger.warning(f"Model validation failed for {model_name}: {e}")
+            return False
+
     @abstractmethod
     def transform_request_to_openai(self, request: LLMRequest) -> Dict[str, Any]:
         """转换请求为OpenAI格式"""

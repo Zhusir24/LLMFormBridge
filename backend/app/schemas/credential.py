@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import datetime
 
 
@@ -7,6 +7,7 @@ class CredentialBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     provider: Literal["openai", "anthropic", "claude_code"]
     api_url: Optional[str] = None
+    custom_models: List[str] = Field(default_factory=list, description="用户自定义的模型列表")
 
 
 class CredentialCreate(CredentialBase):
@@ -23,6 +24,7 @@ class CredentialUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     api_key: Optional[str] = Field(None, min_length=1)
     api_url: Optional[str] = None
+    custom_models: Optional[List[str]] = None
     is_active: Optional[bool] = None
 
     @validator('api_url')
