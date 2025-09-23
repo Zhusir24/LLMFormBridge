@@ -55,6 +55,8 @@ const Models: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -81,6 +83,34 @@ const Models: React.FC = () => {
     }
   };
 
+  const loadAvailableModels = async (credentialId: string) => {
+    if (!credentialId) {
+      setAvailableModels([]);
+      return;
+    }
+
+    setLoadingModels(true);
+    try {
+      const response = await credentialService.getAvailableModels(credentialId);
+      setAvailableModels(response.models);
+    } catch (error: any) {
+      console.error('Failed to load available models:', error);
+      setAvailableModels([]);
+      addNotification({
+        type: 'error',
+        title: '获取模型失败',
+        message: error.response?.data?.detail || '无法获取可用模型',
+      });
+    } finally {
+      setLoadingModels(false);
+    }
+  };
+
+  const handleCredentialChange = async (credentialId: string) => {
+    setFormData({ ...formData, credential_id: credentialId, model_name: '' });
+    await loadAvailableModels(credentialId);
+  };
+
   const handleCreate = () => {
     setEditingModel(null);
     setFormData({
@@ -91,10 +121,11 @@ const Models: React.FC = () => {
       rate_limit: 100,
     });
     setErrors({});
+    setAvailableModels([]);
     setOpen(true);
   };
 
-  const handleEdit = (model: any) => {
+  const handleEdit = async (model: any) => {
     setEditingModel(model);
     setFormData({
       credential_id: model.credential_id,
@@ -105,6 +136,8 @@ const Models: React.FC = () => {
     });
     setErrors({});
     setOpen(true);
+    // 加载可用模型
+    await loadAvailableModels(model.credential_id);
   };
 
   const handleSubmit = async () => {
@@ -386,7 +419,7 @@ const Models: React.FC = () => {
               <InputLabel>选择凭证</InputLabel>
               <Select
                 value={formData.credential_id}
-                onChange={(e) => setFormData({ ...formData, credential_id: e.target.value })}
+                onChange={(e) => handleCredentialChange(e.target.value)}
                 label="选择凭证"
                 disabled={!!editingModel}
               >
@@ -403,14 +436,36 @@ const Models: React.FC = () => {
               )}
             </FormControl>
 
-            <TextField
-              label="模型名称"
-              value={formData.model_name}
-              onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
-              error={!!errors.model_name}
-              helperText={errors.model_name || '例如: gpt-4, claude-3-5-sonnet-20241022'}
-              fullWidth
-            />
+            <FormControl fullWidth error={!!errors.model_name}>
+              <InputLabel>模型名称</InputLabel>
+              <Select
+                value={formData.model_name}
+                onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
+                label="模型名称"
+                disabled={!formData.credential_id || loadingModels}
+              >
+                {loadingModels ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} /> 正在加载模型...
+                  </MenuItem>
+                ) : availableModels.length === 0 ? (
+                  <MenuItem disabled>
+                    {formData.credential_id ? '无可用模型' : '请先选择凭证'}
+                  </MenuItem>
+                ) : (
+                  availableModels.map((model) => (
+                    <MenuItem key={model} value={model}>
+                      {model}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+              {errors.model_name && (
+                <Typography variant="caption" color="error">
+                  {errors.model_name}
+                </Typography>
+              )}
+            </FormControl>
 
             <FormControl fullWidth>
               <InputLabel>目标格式</InputLabel>

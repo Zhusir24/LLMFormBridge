@@ -1,4 +1,4 @@
-export type Provider = 'openai' | 'anthropic';
+export type Provider = 'openai' | 'anthropic' | 'claude_code';
 
 export interface Credential {
   id: string;

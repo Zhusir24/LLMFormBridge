@@ -179,3 +179,33 @@ class CredentialService:
             return f"{api_key[:4]}...{api_key[-4:]}"
         except Exception:
             return "***masked***"
+
+    async def get_available_models(self, user: User, credential_id: str) -> List[str]:
+        """获取凭证支持的可用模型"""
+        credential = self.get_credential_by_id(user, credential_id)
+        if not credential:
+            raise CredentialValidationError("Credential not found")
+
+        if not credential.is_validated:
+            raise CredentialValidationError("Credential is not validated. Please validate the credential first.")
+
+        try:
+            # 解密API密钥
+            api_key = decrypt_api_key(credential.api_key_encrypted)
+
+            # 创建适配器
+            adapter = LLMAdapterFactory.create_adapter(
+                provider=credential.provider,
+                api_key=api_key,
+                api_url=credential.api_url
+            )
+
+            # 获取可用模型
+            models = await adapter.get_available_models()
+            await adapter.close()
+
+            return models
+
+        except Exception as e:
+            logger.error(f"Failed to get available models: {e}")
+            raise CredentialValidationError(f"Failed to get available models: {str(e)}")

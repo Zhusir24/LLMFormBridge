@@ -2,6 +2,7 @@ from typing import Dict, Type, Optional
 from .base import AbstractLLMAdapter
 from .openai_adapter import OpenAIAdapter
 from .anthropic_adapter import AnthropicAdapter
+from .claude_code_adapter import ClaudeCodeAdapter
 
 
 class LLMAdapterFactory:
@@ -10,6 +11,7 @@ class LLMAdapterFactory:
     _adapters: Dict[str, Type[AbstractLLMAdapter]] = {
         "openai": OpenAIAdapter,
         "anthropic": AnthropicAdapter,
+        "claude_code": ClaudeCodeAdapter,
     }
 
     @classmethod
@@ -20,6 +22,10 @@ class LLMAdapterFactory:
         api_url: Optional[str] = None
     ) -> AbstractLLMAdapter:
         """创建适配器实例"""
+        # 自动检测Claude Code凭证
+        if provider == "anthropic" and api_key.startswith("cr_"):
+            provider = "claude_code"
+
         if provider not in cls._adapters:
             raise ValueError(f"Unsupported provider: {provider}. Available: {list(cls._adapters.keys())}")
 

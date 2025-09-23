@@ -5,7 +5,7 @@ from datetime import datetime
 
 class CredentialBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    provider: Literal["openai", "anthropic"]
+    provider: Literal["openai", "anthropic", "claude_code"]
     api_url: Optional[str] = None
 
 

@@ -184,3 +184,21 @@ async def validate_credential(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+@router.get("/{credential_id}/models")
+async def get_credential_available_models(
+    credential_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取凭证支持的可用模型"""
+    try:
+        credential_service = CredentialService(db)
+        models = await credential_service.get_available_models(current_user, credential_id)
+        return {"models": models}
+    except CredentialValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

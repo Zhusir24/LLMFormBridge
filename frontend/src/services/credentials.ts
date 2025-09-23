@@ -25,6 +25,10 @@ export class CredentialService {
   async validateCredential(id: string): Promise<CredentialValidation> {
     return apiClient.post<CredentialValidation>(`/credentials/${id}/validate`);
   }
+
+  async getAvailableModels(id: string): Promise<{ models: string[] }> {
+    return apiClient.get<{ models: string[] }>(`/credentials/${id}/models`);
+  }
 }
 
 export const credentialService = new CredentialService();

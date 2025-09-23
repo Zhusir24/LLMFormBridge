@@ -20,6 +20,7 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
+  Link,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -30,6 +31,8 @@ import {
   Error,
   Warning,
   Refresh as RefreshIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useSnapshot } from 'valtio';
 import { credentialStore } from '../store/credentials';
@@ -51,6 +54,8 @@ const Credentials: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [credentialModels, setCredentialModels] = useState<Record<string, string[]>>({});
+  const [expandedCredentials, setExpandedCredentials] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadCredentials();
@@ -61,6 +66,12 @@ const Credentials: React.FC = () => {
     try {
       const data = await credentialService.getCredentials();
       credentialStore.credentials = data;
+
+      // 为所有已验证的凭证加载可用模型
+      const validatedCredentials = data.filter(c => c.is_validated);
+      await Promise.all(
+        validatedCredentials.map(credential => loadCredentialModels(credential.id))
+      );
     } catch (error: any) {
       addNotification({
         type: 'error',
@@ -70,6 +81,25 @@ const Credentials: React.FC = () => {
     } finally {
       credentialStore.isLoading = false;
     }
+  };
+
+  const loadCredentialModels = async (credentialId: string) => {
+    try {
+      const response = await credentialService.getAvailableModels(credentialId);
+      setCredentialModels(prev => ({
+        ...prev,
+        [credentialId]: response.models
+      }));
+    } catch (error) {
+      console.error('Failed to load models for credential:', credentialId, error);
+    }
+  };
+
+  const toggleModelExpansion = (credentialId: string) => {
+    setExpandedCredentials(prev => ({
+      ...prev,
+      [credentialId]: !prev[credentialId]
+    }));
   };
 
   const handleCreate = () => {
@@ -179,6 +209,8 @@ const Credentials: React.FC = () => {
           title: '验证成功',
           message: `凭证"${credential.name}"验证通过`,
         });
+        // 验证成功后加载可用模型
+        await loadCredentialModels(credential.id);
       } else {
         addNotification({
           type: 'error',
@@ -214,8 +246,10 @@ const Credentials: React.FC = () => {
         return 'OpenAI';
       case 'anthropic':
         return 'Anthropic';
+      case 'claude_code':
+        return 'Claude Code';
       default:
-        return provider.toUpperCase();
+        return String(provider).toUpperCase();
     }
   };
 
@@ -301,6 +335,70 @@ const Credentials: React.FC = () => {
                     </Typography>
                   )}
 
+                  {credential.is_validated && credentialModels[credential.id] && (
+                    <Box mt={1}>
+                      <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.5}>
+                        <Typography variant="body2" color="textSecondary">
+                          支持的模型 ({credentialModels[credential.id].length}个):
+                        </Typography>
+                        {credentialModels[credential.id].length > 3 && (
+                          <Link
+                            component="button"
+                            variant="caption"
+                            onClick={() => toggleModelExpansion(credential.id)}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              textDecoration: 'none',
+                              '&:hover': { textDecoration: 'underline' }
+                            }}
+                          >
+                            {expandedCredentials[credential.id] ? '收起' : '查看全部'}
+                            {expandedCredentials[credential.id] ? (
+                              <ExpandLessIcon fontSize="small" />
+                            ) : (
+                              <ExpandMoreIcon fontSize="small" />
+                            )}
+                          </Link>
+                        )}
+                      </Box>
+                      <Box display="flex" flexWrap="wrap" gap={0.5}>
+                        {(expandedCredentials[credential.id]
+                          ? credentialModels[credential.id]
+                          : credentialModels[credential.id].slice(0, 3)
+                        ).map((model) => (
+                          <Chip
+                            key={model}
+                            label={model}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                              fontSize: '0.7rem',
+                              height: '20px',
+                              '& .MuiChip-label': {
+                                padding: '0 6px'
+                              }
+                            }}
+                          />
+                        ))}
+                        {!expandedCredentials[credential.id] && credentialModels[credential.id].length > 3 && (
+                          <Chip
+                            label={`+${credentialModels[credential.id].length - 3}个`}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                              fontSize: '0.7rem',
+                              height: '20px',
+                              color: 'primary.main',
+                              borderColor: 'primary.main'
+                            }}
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+
                   {credential.validation_error && (
                     <Alert severity="error" sx={{ mt: 1, fontSize: '0.75rem' }}>
                       {credential.validation_error}
@@ -372,6 +470,7 @@ const Credentials: React.FC = () => {
               >
                 <MenuItem value="openai">OpenAI</MenuItem>
                 <MenuItem value="anthropic">Anthropic</MenuItem>
+                <MenuItem value="claude_code">Claude Code</MenuItem>
               </Select>
             </FormControl>
 
@@ -389,7 +488,11 @@ const Credentials: React.FC = () => {
               label="自定义API URL（可选）"
               value={formData.api_url}
               onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
-              placeholder={formData.provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1'}
+              placeholder={
+                formData.provider === 'openai' ? 'https://api.openai.com/v1' :
+                formData.provider === 'anthropic' ? 'https://api.anthropic.com/v1' :
+                formData.provider === 'claude_code' ? 'https://api.claude.ai/v1' : 'https://api.openai.com/v1'
+              }
               fullWidth
             />
           </Box>
