@@ -11,7 +11,7 @@ class Credential(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)
-    provider = Column(String(50), nullable=False)  # 'openai', 'anthropic'
+    provider = Column(String(50), nullable=False)  # 'openai', 'anthropic', 'claude_code', 'gemini', 'ernie', 'qwen', 'azure_openai'
     api_key_encrypted = Column(Text, nullable=False)
     api_url = Column(String(255))
     custom_models = Column(JSON, default=lambda: [])  # 用户自定义的模型列表

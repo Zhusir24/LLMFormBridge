@@ -3,6 +3,10 @@ from .base import AbstractLLMAdapter
 from .openai_adapter import OpenAIAdapter
 from .anthropic_adapter import AnthropicAdapter
 from .claude_code_adapter import ClaudeCodeAdapter
+from .gemini_adapter import GeminiAdapter
+from .ernie_adapter import ErnieAdapter
+from .qwen_adapter import QwenAdapter
+from .azure_openai_adapter import AzureOpenAIAdapter
 
 
 class LLMAdapterFactory:
@@ -12,6 +16,10 @@ class LLMAdapterFactory:
         "openai": OpenAIAdapter,
         "anthropic": AnthropicAdapter,
         "claude_code": ClaudeCodeAdapter,
+        "gemini": GeminiAdapter,
+        "ernie": ErnieAdapter,
+        "qwen": QwenAdapter,
+        "azure_openai": AzureOpenAIAdapter,
     }
 
     @classmethod

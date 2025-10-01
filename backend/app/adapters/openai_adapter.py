@@ -56,7 +56,7 @@ class OpenAIAdapter(AbstractLLMAdapter):
         formatted_messages = self._ensure_message_format(messages)
 
         anthropic_request = {
-            "model": self._map_model_to_anthropic(request.model),
+            "model": request.model,
             "messages": formatted_messages,
             "max_tokens": request.max_tokens,
             "temperature": request.temperature

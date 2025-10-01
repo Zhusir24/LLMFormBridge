@@ -133,7 +133,7 @@ class ClaudeCodeAdapter(AbstractLLMAdapter):
                 filtered_messages[first_user_msg]["content"] = f"{system_content}\n\n{original_content}"
 
         return {
-            "model": self._map_model_to_openai(request.model),
+            "model": request.model,
             "messages": filtered_messages,
             "max_tokens": request.max_tokens,
             "temperature": request.temperature,
