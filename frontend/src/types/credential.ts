@@ -1,4 +1,4 @@
-export type Provider = 'openai' | 'anthropic' | 'claude_code';
+export type Provider = 'openai' | 'anthropic' | 'claude_code' | 'gemini' | 'ernie' | 'qwen' | 'azure_openai';
 
 export interface ModelValidationResult {
   is_valid: boolean;

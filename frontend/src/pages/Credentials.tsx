@@ -399,6 +399,14 @@ const Credentials: React.FC = () => {
         return 'Anthropic';
       case 'claude_code':
         return 'Claude Code';
+      case 'gemini':
+        return 'Google Gemini';
+      case 'ernie':
+        return '百度文心一言';
+      case 'qwen':
+        return '阿里通义千问';
+      case 'azure_openai':
+        return 'Azure OpenAI';
       default:
         return String(provider).toUpperCase();
     }
@@ -629,6 +637,10 @@ const Credentials: React.FC = () => {
                 <MenuItem value="openai">OpenAI</MenuItem>
                 <MenuItem value="anthropic">Anthropic</MenuItem>
                 <MenuItem value="claude_code">Claude Code</MenuItem>
+                <MenuItem value="gemini">Google Gemini</MenuItem>
+                <MenuItem value="ernie">百度文心一言</MenuItem>
+                <MenuItem value="qwen">阿里通义千问</MenuItem>
+                <MenuItem value="azure_openai">Azure OpenAI</MenuItem>
               </Select>
             </FormControl>
 
