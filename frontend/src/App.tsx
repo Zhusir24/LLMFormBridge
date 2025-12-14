@@ -6,6 +6,7 @@ import { Box, CircularProgress } from '@mui/material';
 import { authStore } from './store/auth';
 import { authService } from './services/auth';
 import Layout from './components/common/Layout';
+import NotificationManager from './components/common/NotificationManager';
 import LoginPage from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Credentials from './pages/Credentials';
@@ -61,35 +62,38 @@ function App() {
   }, [token]);
 
   return (
-    <Routes>
-      {/* 公共路由 */}
-      <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <LoginPage />
-          </PublicRoute>
-        }
-      />
+    <>
+      <NotificationManager />
+      <Routes>
+        {/* 公共路由 */}
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
 
-      {/* 私有路由 */}
-      <Route
-        path="/"
-        element={
-          <PrivateRoute>
-            <Layout />
-          </PrivateRoute>
-        }
-      >
-        <Route index element={<Dashboard />} />
-        <Route path="credentials" element={<Credentials />} />
-        <Route path="models" element={<Models />} />
-        <Route path="logs" element={<Logs />} />
-      </Route>
+        {/* 私有路由 */}
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <Layout />
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="credentials" element={<Credentials />} />
+          <Route path="models" element={<Models />} />
+          <Route path="logs" element={<Logs />} />
+        </Route>
 
-      {/* 404路由 */}
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
+        {/* 404路由 */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </>
   );
 }
 

@@ -40,7 +40,11 @@ class ApiClient {
       async (error: AxiosError) => {
         const originalRequest = error.config as any;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // 如果是登录或注册请求失败，直接返回错误，不尝试刷新token
+        const isAuthRequest = originalRequest.url?.includes('/auth/login') || 
+                              originalRequest.url?.includes('/auth/register');
+        
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
           originalRequest._retry = true;
 
           try {
@@ -58,7 +62,12 @@ class ApiClient {
             authStore.isAuthenticated = false;
 
             // 重定向到登录页
-            window.location.href = '/login';
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login';
+            }
+            
+            // 重新抛出错误
+            return Promise.reject(refreshError);
           }
         }
 
